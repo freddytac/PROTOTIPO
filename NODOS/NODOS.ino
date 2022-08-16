@@ -20,15 +20,11 @@ TaskHandle_t Tarea;
 
 /////////////////////////////////////////////////////////////////////////////
 //VARIABLES
-//#define WIFI_AP_NAME        "CELERITY_AVILES PARRA"               // SSID
-//#define WIFI_PASSWORD       "Shodan_user1"                        // CONTRASEÑA
-#define WIFI_AP_NAME        "FAMTACURIM"               // SSID
-#define WIFI_PASSWORD       "20etelvina22"                        // CONTRASEÑA
 
 //#define TOKEN               "YQpHgNCFvaO5ocZPAJNO"                // TOKEN 1
 //#define TOKEN               "f9a3Rmb37jSPbwFAc945"                // TOKEN 2
 //#define TOKEN               "s8eAQoTXImJLjkallS30"                // TOKEN 3
-#define TOKEN               "9p8WhrNL54lhJkxkqMCl"                // TOKEN 4
+#define TOKEN               "9p8WhrNL54lhJkxkqMCl"                // TOKEN 4 
 
 #define THINGSBOARD_SERVER  "thingsboard.cloud"                   // DIRECCION IP O LINK                                                                                       
 WiFiClient espClient;                                             // DEFINICION DEL CLIENTE WIFI
@@ -37,7 +33,7 @@ ThingsBoardSized<128> tb(espClient);
 int status = WL_IDLE_STATUS;                                      // ESTADO DEL RADIO WIFI
 Adafruit_MPU6050 mpu;                                             // DEFINICION DEL SENSOR MPU6050
 bool subscribed=false; 
-uint8_t broadcastAddress[] = {0x78, 0xE3, 0x6D, 0x10, 0x30, 0xB8};// MAC NODO PRINCIPAL
+uint8_t broadcastAddress[] = {0x78, 0xE3, 0x6D, 0x11, 0x17, 0x64};// MAC NODO PRINCIPAL
 //bool letsgo=false;                                                // INICIO DE CARRERA
 #define COUNT_OF(x) ((sizeof(x)/sizeof(0[x])) / ((size_t)(!(sizeof(x) % sizeof(0[x])))))
 bool skate=false;                                                 // Bandera: true=patinando, false=inactivo
@@ -52,6 +48,10 @@ int counter=1;
 float vart, varx, vary, varz;
 int contador=1;
 const int data_items = 4;  
+int valorx = 0;
+const char* ssid = "Mabs";
+const char* password = "123probando";
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 typedef struct struct_message {                                   // Estructura del mensaje
     int id;                                                       // Identificador de la tarjeta
@@ -61,38 +61,11 @@ typedef struct struct_message {                                   // Estructura 
 struct_message espnowMessage;                                     // Creacion del mensaje espnow
 struct_message espnowMessage0;                                    // Creacion del mensaje espnow0
 
-
-esp_now_peer_info_t peerInfo;                                     // Creacion de interfaz entre pares
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //FUNCIONES
-/*RPC_Response GpioState(const RPC_Data &data){                     //  Funcion RPC
-  //Serial.println("Received the set GPIO RPC method");
-  letsgo = data["start"];
-  return RPC_Response(NULL, (bool)data["start"]);
-}
-
-RPC_Callback callbacks[] = {                                      // LLAMADA RPC
-  { "setOrder",    GpioState },
-};*/
-
-
-
 
 void OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingData, int len) {// RECIBE ESPNOW
   memcpy(&espnowMessage0, incomingData, sizeof(espnowMessage0));
-  // Update the structures with the new incoming data
-  //boardsStruct[espnowMessage.id-1].id = espnowMessage.id;
-  //boardsStruct[espnowMessage.id-1].state = espnowMessage.state;
-  //Serial.printf("x value: %d \n", boardsStruct[espnowMessage.id-1].id);
-  //Serial.printf("y value: %d \n", boardsStruct[espnowMessage.id-1].state);
-  //Serial.print("Bytes received: ");
-  //Serial.println(len);
-  //Serial.print("x: ");
-  //Serial.println(myData.x);
-  //Serial.print("y: ");
-  //Serial.println(myData.y);
-  //Serial.println();
-  //Serial.println();
 }
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {// ENVIA ESPNOW
@@ -101,38 +74,7 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {// ENVIA
 }
 
 
-
-///////////////////////////////////////////////////////////////////////////////////////////
-void InitWiFi()
-{
-  Serial.println("Connecting to AP ...");
-  // attempt to connect to WiFi network
-  WiFi.begin(WIFI_AP_NAME, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("Connected to AP");
-  
-}
-
-void reconnect() {
-  // Loop until we're reconnected
-  status = WiFi.status();
-  if ( status != WL_CONNECTED) {
-    WiFi.begin(WIFI_AP_NAME, WIFI_PASSWORD);
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(500);
-      Serial.print(".");
-    }
-    Serial.println("Connected to AP");
-  }
-}
-
-
-
-
-
+///--------------------------------------------------------------------------------///
 //MICROSD
 void initSDCard(){
    if (!SD.begin()) {
@@ -265,6 +207,8 @@ void readFile(fs::FS &fs, const char * path){
     }    
   }
   file.close();
+  //WiFi.disconnect();
+  //internet();
 }
 
 void writeFile(fs::FS &fs, const char * path, const char * message){
@@ -356,31 +300,113 @@ void testFileIO(fs::FS &fs, const char * path){
   file.close();
 }
 
+///--------------------------------------------------------------------------------///
 
+void internet(){
 
-
+  /*
+ WiFi.begin(ssid, password);
+ 
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(100);
+    Serial.println("Setting as a Wi-Fi Station..");
+  }
+  Serial.print("Station IP Address: ");
+  Serial.println(WiFi.localIP());
+  Serial.print("Wi-Fi Channel: ");
+  Serial.println(WiFi.channel());  
+*/
+  // Reconnect to ThingsBoard, if needed
+  if (!tb.connected()) {
+    subscribed = false;
+    // Connect to the ThingsBoard
+    Serial.print("Connecting to: ");
+    Serial.print(THINGSBOARD_SERVER);
+    Serial.print(" with token ");
+    Serial.println(TOKEN);
+    if (!tb.connect(THINGSBOARD_SERVER, TOKEN)) {
+      Serial.println("Failed to connect");
+      return;
+    }
+  }
+  //WiFi.disconnect();
+  }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// NUCLEO0 ========> SINCRONIZACION
+/*void Sincro( void * pvParameters ){
+  for(;;){
+    t0=millis();
+    if(espnowMessage0.nstate==true && espnowMessage0.id==1){
+      //WiFi.mode(WIFI_STA);
+      sensors_event_t a, g, t;
+      mpu.getEvent(&a, &g, &t);
+      dataMessage = String(Time) + "," + String(a.acceleration.x) + "," + String(a.acceleration.y) + "," + String(a.acceleration.z)+"\n";
+      appendFile(SD, "/data.txt", dataMessage.c_str());
+      delay(1);
+      skate=true;
+      //pcapture=true;
+    }
+    else if(skate==true && espnowMessage0.id==0){
+      readFile(SD, "/data.txt");
+      deleteFile(SD, "/data.txt");
+      delay(500);
+      valorx=1;
+      //ESP.restart();
+      skate=false;
+        return;
+      }
+      //WiFi.reconnect();
+      //WiFi.begin(ssid, password);
+      //espnowMessage0.nstate=false;
+      //contador=1;
+      
+    else if(valorx==1){ 
+       ESP.restart();
+    }
+
+    t1=millis();
+    delay(100-t1+t0);   
+  }
+} */
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);                                           // PUERTO SERIAL
-  xTaskCreatePinnedToCore(Sincro,"Tarea",10000,NULL,0,&Tarea,0); // CREACION DE LA TAREA Almacenamiento             
-  delay(500); 
+  //xTaskCreatePinnedToCore(Sincro,"Tarea",10000,NULL,0,&Tarea,0); // CREACION DE LA TAREA Almacenamiento             
+  delay(50); 
+
+   WiFi.begin(ssid, password);
+ 
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(100);
+    Serial.println("Setting as a Wi-Fi Station..");
+  }
+  Serial.print("Station IP Address: ");
+  Serial.println(WiFi.localIP());
+  Serial.print("Wi-Fi Channel: ");
+  Serial.println(WiFi.channel());  
+
+  internet();
   
   WiFi.mode(WIFI_AP_STA);                                         // CONFIGURACION COMO ESTACION WIFI
+
   if (esp_now_init() != ESP_OK) {                                 // VALIDACION DE INICIACION ESPNOW
     Serial.println("Error initializing ESP-NOW");
     return;
   }
-  
+
   esp_now_register_send_cb(OnDataSent);                           // ESTADO DEL PAQUETE TRANSMITIDO
+  esp_now_register_recv_cb(OnDataRecv);                           // ESTADO DEL PAQUETE RECIBIDO
   
 ///////////////////////////////////////////////////
+  esp_now_peer_info_t peerInfo;
+  peerInfo.channel=1;
+  Serial.println(peerInfo.channel);
   // Register peer
   memcpy(peerInfo.peer_addr, broadcastAddress, 6);
-  peerInfo.channel = 0;  
   peerInfo.encrypt = false;
   
   
@@ -389,11 +415,25 @@ void setup() {
     Serial.println("Failed to add peer");
     return;
   }
-  esp_now_register_recv_cb(OnDataRecv);                           // ESTADO DEL PAQUETE RECIBIDO
+
 ///////////////////////////////////////////////////
 
   initSDCard();                                                   // INICIALIZACION MICROSD
   deleteFile(SD, "/data.txt");
+
+  espnowMessage.id = ID;                                                                              //ID
+  espnowMessage.nstate = true;                                                                        //ESTADO
+  esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &espnowMessage, sizeof(espnowMessage));//
+  if (result == ESP_OK) {
+    Serial.println("Sent with success");
+  }
+  else {
+    Serial.println("Error sending the data");
+  }
+
+
+///--------------------------------------------------------------------------------///
+  
   if (!mpu.begin()) {                                             // INICIALIZACION MPU6050
     Serial.println("Failed to find MPU6050 chip");
     while (1) {
@@ -461,99 +501,43 @@ void setup() {
     break;
   }
 
-
-  espnowMessage.id = ID;                                                                              //ID
-  espnowMessage.nstate = true;                                                                        //ESTADO
-  esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &espnowMessage, sizeof(espnowMessage));//
-  if (result == ESP_OK) {
-    Serial.println("Sent with success");
-  }
-  else {
-    Serial.println("Error sending the data");
-  }
-
+///--------------------------------------------------------------------------------///
 
 }
 
 void loop() {
   
-  // Reconnect to WiFi, if needed
-  if (WiFi.status() != WL_CONNECTED) {
-    reconnect();
-    return;
-  }
-  // Reconnect to ThingsBoard, if needed
-  if (!tb.connected()) {
-    subscribed = false;
-    // Connect to the ThingsBoard
-    Serial.print("Connecting to: ");
-    Serial.print(THINGSBOARD_SERVER);
-    Serial.print(" with token ");
-    Serial.println(TOKEN);
-    if (!tb.connect(THINGSBOARD_SERVER, TOKEN)) {
-      Serial.println("Failed to connect");
-      return;
-    }
-  }
-
-  /*if(pcapture==true){    
-      sensors_event_t a, g, t;
-      mpu.getEvent(&a, &g, &t);
-      dataMessage = String(Time) + "," + String(a.acceleration.x) + "," + String(a.acceleration.y) + "," + String(a.acceleration.z)+"\n";
-      appendFile(SD, "/data.txt", dataMessage.c_str());
-      //Serial.println(">>>>>>>>>>>>NODOS ACTIVIDOS<<<<<<<");
-      pcapture=false;
-  }
-  //Serial.println(npsent);
-  if (npsent==true && skate==false){
-    readFile(SD, "/data.txt");
-    deleteFile(SD, "/data.txt");
-    npsent=false;
-    
-    //Serial.println(">>>>>>>>>>>>-----------------------------<<<<<<<");
-    //delay(50);
-  }*/
-
-  
-
-
-  delay(5); 
-}
-
-
-/////////////////////////////////////////////////////////////////////////////
-// NUCLEO0 ========> SINCRONIZACION
-void Sincro( void * pvParameters ){
-  for(;;){
-    //t0=millis();
+    t0=millis();
     if(espnowMessage0.nstate==true && espnowMessage0.id==1){
+      //WiFi.mode(WIFI_STA);
       sensors_event_t a, g, t;
       mpu.getEvent(&a, &g, &t);
       dataMessage = String(Time) + "," + String(a.acceleration.x) + "," + String(a.acceleration.y) + "," + String(a.acceleration.z)+"\n";
       appendFile(SD, "/data.txt", dataMessage.c_str());
-      
+      delay(1);
       skate=true;
       //pcapture=true;
-      delay(1);
-      espnowMessage0.nstate=false;
     }
     else if(skate==true && espnowMessage0.id==0){
       readFile(SD, "/data.txt");
       deleteFile(SD, "/data.txt");
-      skate=false;
-      espnowMessage0.nstate=false;
-      contador=1;
-      //delay(50);
+      delay(100);
+      valorx=1;
+      //ESP.restart();
+      //skate=false;
+        //return;
+      }
+      //WiFi.reconnect();
+      //WiFi.begin(ssid, password);
+      //espnowMessage0.nstate=false;
+      //contador=1;
+      
+    if(valorx==1){
+      Serial.println("hola"); 
+       ESP.restart();
     }
-    else{
-      delay(1);
-    }
-    //Serial.println("NUCLEO 0");
-    ///////////////////////////////////////////////////////////////////////////
-    //t1=millis();
-    //delay(100-t1+t0);   
-  }
-} 
 
-
-/////////////////////////////////////////////////////////////////////////////
+    t1=millis();
+    delay(100-t1+t0); 
+  
+}
