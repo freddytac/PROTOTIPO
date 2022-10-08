@@ -1,24 +1,25 @@
 #include "ThingsBoard.h"
-#include <Arduino.h>
 #include <esp_now.h>
 #include <WiFi.h>
-#include <Wire.h>
-#include <esp_wifi.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include <stdio.h>
+#include "esp_system.h"
+#include "driver/gpio.h"
+
 
 #define TOKEN               "lMScR4Sz50sKRVZm02xv"                // TOKEN
 #define THINGSBOARD_SERVER  "thingsboard.cloud"                   // DIRECCION IP O LINK
 WiFiClient espClient;                                             // DEFINICION DEL CLIENTE WIFI 
-ThingsBoardSized<128> tb(espClient);                              // DEFINICION DEL CLIENTE MQTT
+ThingsBoardSized<64> tb(espClient);                              // DEFINICION DEL CLIENTE MQTT
 int status = WL_IDLE_STATUS;                                      // ESTADO DEL RADIO WIFI
 bool subscribed=false;                                          
-bool state=false;                                                 // ESTADO DE TODOS LOS NODOS(TRUE=SISTEMA LISTO, FALSE=FALSE)
+bool state=false;                                                 // ESTADO DE TODOS LOS NODOS(TRUE=SISTEMA LISTO, FALSE=FALSE)                                              
 int letsgo=0;                                                     // INICIO DE CARRERA
 #define COUNT_OF(x) ((sizeof(x)/sizeof(0[x])) / ((size_t)(!(sizeof(x) % sizeof(0[x])))))
 
-
 const char* ssid = "Mabs";
 const char* password = "123probando";
-
 
 // REPLACE WITH YOUR ESP RECEIVER'S MAC ADDRESS
 uint8_t broadcastAddress1[] = {0x30, 0xC6, 0xF7, 0x2F, 0x17, 0x40};
@@ -69,14 +70,97 @@ RPC_Callback callbacks[] = {                                      // LLAMADA RPC
   { "setOrder",    GpioState }
 };
 
-void setup() {
-  // Initialize Serial Monitor
+
+esp_err_t create_tasks(void)
+{
+  static uint8_t ucParameterToPass;
+  TaskHandle_t xHandle=NULL;
+
+  xTaskCreatePinnedToCore(vTaskTb,
+             "vTaskTb",
+             1024*2,
+             &ucParameterToPass,
+             1,
+             &xHandle,
+             0);
+  xTaskCreatePinnedToCore(vTaskESP_NOW,
+             "vTaskESP_NOW",
+             1024*1.5,
+             &ucParameterToPass,
+             1,
+             &xHandle,
+             1);   
+}
+
+
+void vTaskTb(void *pvParameters)
+{
+  while (1)
+  {
+    if (!tb.connected()) {
+    subscribed = false;
+    // Connect to the ThingsBoard
+    Serial.print("Connecting to: ");
+    Serial.print(THINGSBOARD_SERVER);
+    Serial.print(" with token ");
+    Serial.println(TOKEN);
+    if (!tb.connect(THINGSBOARD_SERVER, TOKEN)) {
+      Serial.println("Failed to connect");
+      return;
+      }
+    tb.sendTelemetryBool("state", state);
+    }
+
+    // Subscribe for RPC, if needed
+    if (!subscribed) {
+      Serial.println("Subscribing for RPC...");
+      // Perform a subscription. All consequent data processing will happen in
+      // callbacks as denoted by callbacks[] array.
+      if (!tb.RPC_Subscribe(callbacks, COUNT_OF(callbacks))) {
+        Serial.println("Failed to subscribe for RPC");
+        return;
+      }
+      Serial.println("Subscribe done");
+      subscribed = true;
+      }
+    tb.loop();
+    vTaskDelay(pdMS_TO_TICKS(10)); 
+    }  
+}
+
+void vTaskESP_NOW(void *pvParameters)
+{
+  while (1)
+  {
+    if(boardsStruct[0].nstate==true && boardsStruct[1].nstate==true && boardsStruct[2].nstate==true && boardsStruct[3].nstate==true && state==false){
+      state=true;
+      tb.sendTelemetryBool("state", state);
+    } 
+    
+    if(letsgo==1){
+      espnowMessage0.id=1;
+      espnowMessage0.nstate=true;
+      esp_err_t result = esp_now_send(0, (uint8_t *) &espnowMessage0, sizeof(struct_message));
+      //ESP.restart();
+      
+    }
+    else if(letsgo==2){
+      espnowMessage0.id=0;
+      espnowMessage0.nstate=false;
+      esp_err_t result = esp_now_send(0, (uint8_t *) &espnowMessage0, sizeof(struct_message));
+      //ESP.restart();
+    }
+    
+    vTaskDelay(pdMS_TO_TICKS(10)); 
+    }  
+}
+
+void setup()
+{
   Serial.begin(115200);
-  
-  // Set the device as a Station and Soft Access Point simultaneously
+   
   WiFi.mode(WIFI_AP_STA);
 
-  
   if (esp_now_init() != ESP_OK) {                                 // VALIDACION DE INICIACION ESPNOW
     Serial.println("Error initializing ESP-NOW");
     return;
@@ -85,13 +169,9 @@ void setup() {
   // Set device as a Wi-Fi Station
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
-    delay(100);
+    vTaskDelay(pdMS_TO_TICKS(1000));
     Serial.println("Setting as a Wi-Fi Station..");
   }
-  Serial.print("Station IP Address: ");
-  Serial.println(WiFi.localIP());
-  Serial.print("Wi-Fi Channel: ");
-  Serial.println(WiFi.channel());
 
   esp_now_register_recv_cb(OnDataRecv);                           // REGISTRO PARA OBTENER EL MENSAJE ESPNOW
   esp_now_register_send_cb(OnDataSent); 
@@ -123,60 +203,10 @@ void setup() {
   if (esp_now_add_peer(&peerInfo) != ESP_OK){
     Serial.println("Failed to add peer");
     return;
-  } 
-}
-
-void loop() {
+  }
   
- if (!tb.connected()) {
-    subscribed = false;
-    // Connect to the ThingsBoard
-    Serial.print("Connecting to: ");
-    Serial.print(THINGSBOARD_SERVER);
-    Serial.print(" with token ");
-    Serial.println(TOKEN);
-    if (!tb.connect(THINGSBOARD_SERVER, TOKEN)) {
-      Serial.println("Failed to connect");
-      return;
-    }
-  }
-
-  // Subscribe for RPC, if needed
-  if (!subscribed) {
-    Serial.println("Subscribing for RPC...");
-    // Perform a subscription. All consequent data processing will happen in
-    // callbacks as denoted by callbacks[] array.
-    if (!tb.RPC_Subscribe(callbacks, COUNT_OF(callbacks))) {
-      Serial.println("Failed to subscribe for RPC");
-      return;
-    }
-    Serial.println("Subscribe done");
-    subscribed = true;
-    tb.sendTelemetryBool("state", state);
-  }
- 
-
-  if(boardsStruct[0].nstate==true && boardsStruct[1].nstate==true && boardsStruct[2].nstate==true && boardsStruct[3].nstate==true && state==false){
-      state=true;
-      tb.sendTelemetryBool("state", state);
-  } 
-
-  if(letsgo==1){
-    espnowMessage0.id=1;
-    espnowMessage0.nstate=true;
-    esp_err_t result = esp_now_send(0, (uint8_t *) &espnowMessage0, sizeof(struct_message));
-    delay(50);
-    ESP.restart();
-    
-  }
-  else if(letsgo==2){
-    espnowMessage0.id=0;
-    espnowMessage0.nstate=false;
-    esp_err_t result = esp_now_send(0, (uint8_t *) &espnowMessage0, sizeof(struct_message));
-    delay(50);
-    ESP.restart();
-  }
-
-  tb.loop();
-  delay(10);    
+  create_tasks(); 
 }
+
+//void setup() {}
+void loop() {}
