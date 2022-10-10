@@ -2,6 +2,7 @@
  *  NOMBRES: MIGUEL BELTRAN Y FREDDY TACURI
 */
 ////////////////////////////////////////////////////////////////////////////
+#define DEBUG 1
 //LIBRERIAS
 #include "ThingsBoard.h"                                          // 
 #include <Arduino.h>
@@ -65,22 +66,26 @@ void OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingData, int len) 
   memcpy(&espnowMessage0, incomingData, sizeof(espnowMessage0));
 }
 
-// ENVIA ESPNO
+// ENVIA ESPNOW
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+#ifdef DEBUG
   Serial.print("\r\nLast Packet Send Status:\t");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+#endif
 }
 
 
 ///--------------------------------------------------------------------------------///
 //MICROSD
 void initSDCard(){
-   if (!SD.begin()) {
+  if (!SD.begin()) {
+    #ifdef DEBUG
     Serial.println("Card Mount Failed");
+    #endif
     return;
   }
   uint8_t cardType = SD.cardType();
-
+  #ifdef DEBUG
   if(cardType == CARD_NONE){
     Serial.println("No SD card attached");
     return;
@@ -95,71 +100,102 @@ void initSDCard(){
   } else {
     Serial.println("UNKNOWN");
   }
+  #endif
   uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+  #ifdef DEBUG
   Serial.printf("SD Card Size: %lluMB\n", cardSize);
+  #endif
 }
 
 void listDir(fs::FS &fs, const char * dirname, uint8_t levels){
+  #ifdef DEBUG
   Serial.printf("Listing directory: %s\n", dirname);
-
+  #endif
+  
   File root = fs.open(dirname);
   if(!root){
+    #ifdef DEBUG
     Serial.println("Failed to open directory");
+    #endif
     return;
   }
+  
   if(!root.isDirectory()){
+    #ifdef DEBUG
     Serial.println("Not a directory");
+    #endif
     return;
   }
-
+  
   File file = root.openNextFile();
   while(file){
     if(file.isDirectory()){
+      #ifdef DEBUG
       Serial.print("  DIR : ");
       Serial.println(file.name());
+      #endif
+      
       if(levels){
         listDir(fs, file.name(), levels -1);
       }
-    } else {
+    }
+    #ifdef DEBUG 
+    else {
       Serial.print("  FILE: ");
       Serial.print(file.name());
       Serial.print("  SIZE: ");
       Serial.println(file.size());
     }
+    #endif
     file = root.openNextFile();
   }
 }
 
 void createDir(fs::FS &fs, const char * path){
+  #ifdef DEBUG
   Serial.printf("Creating Dir: %s\n", path);
+  #endif
   if(fs.mkdir(path)){
+    #ifdef DEBUG
     Serial.println("Dir created");
-  } else {
+    #endif
+  } 
+  #ifdef DEBUG
+  else {
     Serial.println("mkdir failed");
   }
+  #endif
 }
 
 void removeDir(fs::FS &fs, const char * path){
+  #ifdef DEBUG
   Serial.printf("Removing Dir: %s\n", path);
+  #endif
   if(fs.rmdir(path)){
+    #ifdef DEBUG
     Serial.println("Dir removed");
-  } else {
+    #endif
+  } 
+  #ifdef DEBUG
+  else {
     Serial.println("rmdir failed");
   }
+  #endif
 }
 
 void readFile(fs::FS &fs, const char * path){
+  #ifdef DEBUG
   Serial.printf("Reading file: %s\n", path);
-
+  #endif
   File file = fs.open(path);
   if(!file){
+    #ifdef DEBUG
     Serial.println("Failed to open file for reading");
+    #endif
     return;
   }
 
-  //Serial.print("Read from file: ");
   while(file.available()){
-    //Serial.write(file.read());
     char character = file.read();
     if (character != ',' && character != '\n'){
       data0.concat(character);
@@ -191,7 +227,6 @@ void readFile(fs::FS &fs, const char * path){
       data0 = "";
     }   
     if(character == '\n'){
-      //tb.loop();
       Telemetry datos[data_items] = {
         { "Time", vart},
         { "ax", varx},
@@ -207,65 +242,99 @@ void readFile(fs::FS &fs, const char * path){
 }
 
 void writeFile(fs::FS &fs, const char * path, const char * message){
+  #ifdef DEBUG
   Serial.printf("Writing file: %s\n", path);
-
+  #endif
   File file = fs.open(path, FILE_WRITE);
   if(!file){
+    #ifdef DEBUG
     Serial.println("Failed to open file for writing");
+    #endif
     return;
   }
   if(file.print(message)){
+    #ifdef DEBUG
     Serial.println("File written");
-  } else {
+    #endif
+  } 
+  #ifdef DEBUG
+  else {
     Serial.println("Write failed");
   }
+  #endif
   file.close();
 }
 
 void appendFile(fs::FS &fs, const char * path, const char * message){
+  #ifdef DEBUG
   Serial.printf("Appending to file: %s\n", path);
-
+  #endif
   File file = fs.open(path, FILE_APPEND);
   if(!file){
+    #ifdef DEBUG
     Serial.println("Failed to open file for appending");
+    #endif
     return;
   }
   if(file.print(message)){
-      Serial.println("Message appended");
-  } else {
+    #ifdef DEBUG
+    Serial.println("Message appended");
+    #endif
+  } 
+  #ifdef DEBUG
+  else {
     Serial.println("Append failed");
   }
+  #endif
   file.close();
 }
 
 void renameFile(fs::FS &fs, const char * path1, const char * path2){
+  #ifdef DEBUG
   Serial.printf("Renaming file %s to %s\n", path1, path2);
+  #endif
   if (fs.rename(path1, path2)) {
+    #ifdef DEBUG
     Serial.println("File renamed");
-  } else {
+    #endif
+  } 
+  #ifdef DEBUG
+  else {
     Serial.println("Rename failed");
   }
+  #endif
 }
 
 void deleteFile(fs::FS &fs, const char * path){
+  #ifdef DEBUG
   Serial.printf("Deleting file: %s\n", path);
+  #endif
   if(fs.remove(path)){
+    #ifdef DEBUG
     Serial.println("File deleted");
-  } else {
+    #endif
+  } 
+  #ifdef DEBUG
+  else {
     Serial.println("Delete failed");
   }
+  #endif
 }
 
 void accelerometer(){
   if (!mpu.begin()) {                                             // INICIALIZACION MPU6050
+    #ifdef DEBUG
     Serial.println("Failed to find MPU6050 chip");
+    #endif
     while (1) {
       delay(10);
     }
   }
+  #ifdef DEBUG
   Serial.println("MPU6050 Found!");
-
+  #endif
   mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
+  #ifdef DEBUG
   Serial.print("Accelerometer range set to: ");
   switch (mpu.getAccelerometerRange()) {
   case MPU6050_RANGE_2_G:
@@ -281,7 +350,9 @@ void accelerometer(){
     Serial.println("+-16G");
     break;
   }
+  #endif
   mpu.setGyroRange(MPU6050_RANGE_250_DEG);
+  #ifdef DEBUG
   Serial.print("Gyro range set to: ");
   switch (mpu.getGyroRange()) {
   case MPU6050_RANGE_250_DEG:
@@ -297,8 +368,10 @@ void accelerometer(){
     Serial.println("+- 2000 deg/s");
     break;
   }
+  #endif
 
   mpu.setFilterBandwidth(MPU6050_BAND_260_HZ);
+  #ifdef DEBUG
   Serial.print("Filter bandwidth set to: ");
   switch (mpu.getFilterBandwidth()) {
   case MPU6050_BAND_260_HZ:
@@ -323,6 +396,7 @@ void accelerometer(){
     Serial.println("5 Hz");
     break;
   }
+  #endif
 }
 
 esp_err_t create_tasksN(void)
@@ -332,7 +406,7 @@ esp_err_t create_tasksN(void)
 
   xTaskCreatePinnedToCore(vTaskTbN,
              "vTaskTbN",
-             1024*4,
+             1024*5,
              &ucParameterToPass,
              1,
              &xHandle,
@@ -353,13 +427,17 @@ void vTaskTbN(void *pvParameters)
 
   if (!tb.connected()) {                                          // VERIFICA CONEXION THINGBOARD
     subscribed = false;
+    #ifdef DEBUG
     // Connect to the ThingsBoard
     Serial.print("Connecting to: ");
     Serial.print(THINGSBOARD_SERVER);
     Serial.print(" with token ");
     Serial.println(TOKEN);
+    #endif
     if (!tb.connect(THINGSBOARD_SERVER, TOKEN)) {                 // VERIFICA CONEXION CON EL TOKEN
+      #ifdef DEBUG
       Serial.println("Failed to connect");
+      #endif
       return;
     }
   }
@@ -368,13 +446,14 @@ void vTaskTbN(void *pvParameters)
     tb.sendTelemetryBool("t_start", true);
     readFile(SD, "/data.txt");
     valorx=1;
+    skate=false;
     }
       
   if(valorx==1){ 
     ESP.restart();
     }  
     
-  vTaskDelay(pdMS_TO_TICKS(10)); 
+  vTaskDelay(pdMS_TO_TICKS(5)); 
   }
 }
 
@@ -391,12 +470,10 @@ void vTaskESP_N(void *pvParameters)
       }
     sensors_event_t a, g, t;
     mpu.getEvent(&a, &g, &t);
-    dataMessage = String(millis()-tiempop) + "," + String(-1*a.acceleration.z) + "," + String(a.acceleration.y) + "," + String(a.acceleration.x)+"\n";
+    dataMessage = (millis()-tiempop) + a.acceleration.z + a.acceleration.y + a.acceleration.x;
     appendFile(SD, "/data.txt", dataMessage.c_str());
-    
-  //vTaskDelay(pdMS_TO_TICKS(100+t0-millis())); 
+    vTaskDelay(pdMS_TO_TICKS(100+t0-millis())); 
   }
-  vTaskDelay(pdMS_TO_TICKS(10)); 
   }
 }
 
@@ -407,14 +484,18 @@ void setup() {
   WiFi.begin(ssid, password);                                     // AUTENTIFICACION RED WIFI
  
   while (WiFi.status() != WL_CONNECTED) {                         // VERIFICACION DE ESTADO CONECTADO
-    delay(1000);
+    delay(100);
+    #ifdef DEBUG
     Serial.println("Setting as a Wi-Fi Station..");
+    #endif
   }
   
   WiFi.mode(WIFI_AP_STA);                                         // CONFIGURACION COMO AP Y ESTACION WIFI
 
   if (esp_now_init() != ESP_OK) {                                 // VALIDACION DE INICIACION ESPNOW
+    #ifdef DEBUG
     Serial.println("Error initializing ESP-NOW");
+    #endif
     return;
   }
 
@@ -429,7 +510,9 @@ void setup() {
   
   // AGREGA EL EMPAREJAMIENTO      
   if (esp_now_add_peer(&peerInfo) != ESP_OK){
+    #ifdef DEBUG
     Serial.println("Failed to add peer");
+    #endif
     return;
   }
 
@@ -441,12 +524,15 @@ void setup() {
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &espnowMessage, sizeof(espnowMessage)); // RESULTADO DEL ENVIO DEL PAQUETE ESPNOW
   
   if (result == ESP_OK) {
+    #ifdef DEBUG
     Serial.println("Sent with success");
+    #endif
   }
+  #ifdef DEBUG
   else {
     Serial.println("Error sending the data");
   }
-
+  #endif
   accelerometer();                                                // INICIA EL ACELEROMETRO
   create_tasksN();
 }
