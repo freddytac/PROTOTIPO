@@ -1,5 +1,4 @@
-/* UNIVERSIDAD DE CUENCA
- *  NOMBRES: MIGUEL BELTRAN Y FREDDY TACURI
+/* UNIVERSIDAD ;MBRES: MIGUEL BELTRAN Y FREDDY TACURI
 */
 ////////////////////////////////////////////////////////////////////////////
 #define DEBUG 1
@@ -14,20 +13,24 @@
 #include "FS.h"                                                   // LIBRERIAS MICROSD
 #include "SD.h"
 #include "SPI.h"
+#include "base64.hpp"
 
-String data0 = "";
+File file;
+unsigned char buf[96];
+unsigned char base64[128];
 //TaskHandle_t Tarea;
 
 /////////////////////////////////////////////////////////////////////////////
 //VARIABLES
 
-#define TOKEN               "YQpHgNCFvaO5ocZPAJNO"                // TOKEN 1 
+#define TOKEN               "f9a3Rmb37jSPbwFAc945"                // TOKEN 2 
 
 
 #define THINGSBOARD_SERVER  "thingsboard.cloud"                   // DIRECCION IP O LINK                                                                                       
 WiFiClient espClient;                                             // DEFINICION DEL CLIENTE WIFI
 //ThingsBoard tb(espClient);                                      // DEFINICION DEL CLIENTE MQTT 
-ThingsBoardSized<128> tb(espClient);
+ThingsBoardSized<256> tb(espClient);
+//ThingsBoardSized<128, 2> tb(espClient);
 int status = WL_IDLE_STATUS;                                      // ESTADO DEL RADIO WIFI
 Adafruit_MPU6050 mpu;                                             // DEFINICION DEL SENSOR MPU6050
 bool subscribed=false; 
@@ -43,12 +46,14 @@ int t1=0;                                                         // Tiempo de e
 int tiempop=0;
 int counter=1;
 float vart, varx, vary, varz;
-const int data_items = 4;  
+const int data_items = 1;  
 int valorx = 0;
 bool bandera=false;
 const char* ssid = "Mabs";
 const char* password = "123probando";
-
+unsigned char data1[240];
+int cont = 0;
+char* datan;
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 //MENSAJES ESPNOW
 typedef struct struct_message {                                   // Estructura del mensaje
@@ -107,82 +112,6 @@ void initSDCard(){
   #endif
 }
 
-void listDir(fs::FS &fs, const char * dirname, uint8_t levels){
-  #ifdef DEBUG
-  Serial.printf("Listing directory: %s\n", dirname);
-  #endif
-  
-  File root = fs.open(dirname);
-  if(!root){
-    #ifdef DEBUG
-    Serial.println("Failed to open directory");
-    #endif
-    return;
-  }
-  
-  if(!root.isDirectory()){
-    #ifdef DEBUG
-    Serial.println("Not a directory");
-    #endif
-    return;
-  }
-  
-  File file = root.openNextFile();
-  while(file){
-    if(file.isDirectory()){
-      #ifdef DEBUG
-      Serial.print("  DIR : ");
-      Serial.println(file.name());
-      #endif
-      
-      if(levels){
-        listDir(fs, file.name(), levels -1);
-      }
-    }
-    #ifdef DEBUG 
-    else {
-      Serial.print("  FILE: ");
-      Serial.print(file.name());
-      Serial.print("  SIZE: ");
-      Serial.println(file.size());
-    }
-    #endif
-    file = root.openNextFile();
-  }
-}
-
-void createDir(fs::FS &fs, const char * path){
-  #ifdef DEBUG
-  Serial.printf("Creating Dir: %s\n", path);
-  #endif
-  if(fs.mkdir(path)){
-    #ifdef DEBUG
-    Serial.println("Dir created");
-    #endif
-  } 
-  #ifdef DEBUG
-  else {
-    Serial.println("mkdir failed");
-  }
-  #endif
-}
-
-void removeDir(fs::FS &fs, const char * path){
-  #ifdef DEBUG
-  Serial.printf("Removing Dir: %s\n", path);
-  #endif
-  if(fs.rmdir(path)){
-    #ifdef DEBUG
-    Serial.println("Dir removed");
-    #endif
-  } 
-  #ifdef DEBUG
-  else {
-    Serial.println("rmdir failed");
-  }
-  #endif
-}
-
 void readFile(fs::FS &fs, const char * path){
   #ifdef DEBUG
   Serial.printf("Reading file: %s\n", path);
@@ -195,114 +124,17 @@ void readFile(fs::FS &fs, const char * path){
     return;
   }
 
-  while(file.available()){
-    char character = file.read();
-    if (character != ',' && character != '\n'){
-      data0.concat(character);
-    }
-    else{
-      switch(counter){
-        case 1:
-          vart=data0.toInt();
-          Serial.print("Time: ");
-          Serial.print(data0);  
-          break;
-        case 2:
-          varx=data0.toFloat();
-          Serial.print(" ax: ");
-          Serial.print(data0);
-          break;
-        case 3:
-          vary=data0.toFloat();
-          Serial.print(" ay: ");
-          Serial.print(data0);
-          break;
-        case 4:
-          varz=data0.toFloat();
-          Serial.print(" az: ");
-          Serial.println(data0);
-          break;
-        }       
-      counter++;
-      data0 = "";
-    }   
-    if(character == '\n'){
-      Telemetry datos[data_items] = {
-        { "Time", vart},
-        { "ax", varx},
-        { "ay", vary},
-        { "az", varz},
-      };
-      tb.sendTelemetry(datos, data_items);
-      delay(213);
-      counter=1;
-    }    
+  if (file) {
+    while (file.available()) {
+      file.read(buf,96);
+      unsigned int base64_length = encode_base64(buf, 96, base64);
+      printf("%d\n", base64_length);
+      datan = (char*)base64;
+      tb.sendTelemetryString("array", datan);
+      vTaskDelay(pdMS_TO_TICKS(400)); 
+    } 
   }
   file.close();
-}
-
-void writeFile(fs::FS &fs, const char * path, const char * message){
-  #ifdef DEBUG
-  Serial.printf("Writing file: %s\n", path);
-  #endif
-  File file = fs.open(path, FILE_WRITE);
-  if(!file){
-    #ifdef DEBUG
-    Serial.println("Failed to open file for writing");
-    #endif
-    return;
-  }
-  if(file.print(message)){
-    #ifdef DEBUG
-    Serial.println("File written");
-    #endif
-  } 
-  #ifdef DEBUG
-  else {
-    Serial.println("Write failed");
-  }
-  #endif
-  file.close();
-}
-
-void appendFile(fs::FS &fs, const char * path, const char * message){
-  #ifdef DEBUG
-  Serial.printf("Appending to file: %s\n", path);
-  #endif
-  File file = fs.open(path, FILE_APPEND);
-  if(!file){
-    #ifdef DEBUG
-    Serial.println("Failed to open file for appending");
-    #endif
-    return;
-  }
-  if(file.print(message)){
-    #ifdef DEBUG
-    Serial.println("Message appended");
-    #endif
-  } 
-  #ifdef DEBUG
-  else {
-    Serial.println("Append failed");
-  }
-  #endif
-  file.close();
-}
-
-void renameFile(fs::FS &fs, const char * path1, const char * path2){
-  #ifdef DEBUG
-  Serial.printf("Renaming file %s to %s\n", path1, path2);
-  #endif
-  if (fs.rename(path1, path2)) {
-    #ifdef DEBUG
-    Serial.println("File renamed");
-    #endif
-  } 
-  #ifdef DEBUG
-  else {
-    Serial.println("Rename failed");
-  }
-  #endif
 }
 
 void deleteFile(fs::FS &fs, const char * path){
@@ -327,13 +159,13 @@ void accelerometer(){
     Serial.println("Failed to find MPU6050 chip");
     #endif
     while (1) {
-      delay(10);
+      vTaskDelay(pdMS_TO_TICKS(10)); 
     }
   }
   #ifdef DEBUG
   Serial.println("MPU6050 Found!");
   #endif
-  mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
+  mpu.setAccelerometerRange(MPU6050_RANGE_4_G);
   #ifdef DEBUG
   Serial.print("Accelerometer range set to: ");
   switch (mpu.getAccelerometerRange()) {
@@ -406,7 +238,7 @@ esp_err_t create_tasksN(void)
 
   xTaskCreatePinnedToCore(vTaskTbN,
              "vTaskTbN",
-             1024*5,
+             1024*10,
              &ucParameterToPass,
              1,
              &xHandle,
@@ -461,19 +293,86 @@ void vTaskESP_N(void *pvParameters)
 {
   while (1)
   {
+
   t0=millis();
   if(espnowMessage0.nstate==true && espnowMessage0.id==1){
     if(bandera==false){
-      tiempop=millis();
       bandera=true;
       skate=true;
       }
     sensors_event_t a, g, t;
     mpu.getEvent(&a, &g, &t);
-    dataMessage = (millis()-tiempop) + a.acceleration.z + a.acceleration.y + a.acceleration.x;
-    appendFile(SD, "/data.txt", dataMessage.c_str());
-    vTaskDelay(pdMS_TO_TICKS(100+t0-millis())); 
-  }
+
+    union u_tag {
+    struct {
+     int16_t ax; 
+     int16_t ay;
+     int16_t az;
+     int16_t gx; 
+     int16_t gy;
+     int16_t gz;
+    };
+     unsigned char all[12];
+    } u;
+    
+    u.ax = int16_t((a.acceleration.x)*1000);
+    #ifdef DEBUG
+    Serial.print(a.acceleration.x,3);
+    Serial.print(" ");
+    #endif 
+    u.ay = int16_t((a.acceleration.y)*1000);
+    #ifdef DEBUG
+    Serial.print(a.acceleration.y,3);
+    Serial.print(" ");
+    #endif 
+    u.az = int16_t((a.acceleration.z)*1000);
+    
+    u.gx = int16_t((g.gyro.x)*1000);
+    #ifdef DEBUG
+    Serial.print(g.gyro.x,3);
+    Serial.print(" ");
+    #endif 
+    u.gy = int16_t((g.gyro.y)*1000);
+    #ifdef DEBUG
+    Serial.print(g.gyro.y,3);
+    Serial.println(" ");
+    #endif 
+    u.gz = int16_t((g.gyro.z)*1000);
+    
+    memcpy(&data1[cont*12], u.all, sizeof(u.all));
+    cont=cont + 1;
+    }
+    if (cont == 20 && espnowMessage0.nstate==true && espnowMessage0.id==1){
+    file = SD.open("/data.txt", FILE_APPEND);
+    if (file) {
+      file.write(data1, 240);
+      file.close();
+      unsigned char data1[240];
+      cont=0;
+      } 
+      #ifdef DEBUG
+      else {
+      Serial.print(F("SD Card: error on opening file"));
+      }
+      #endif 
+    }
+    else if(bandera == true && espnowMessage0.id==0){
+    file = SD.open("/data.txt", FILE_APPEND);
+    if (file) {
+      file.write(data1, 24*(cont));
+      file.close();
+      unsigned char data1[240];
+      cont=0;
+      } 
+      #ifdef DEBUG
+      else {
+      Serial.print(F("SD Card: error on opening file"));
+      }
+      #endif 
+    
+    }
+  //Serial.println(cont);
+  vTaskDelay(pdMS_TO_TICKS(100+t0-millis())); 
   }
 }
 
@@ -484,7 +383,7 @@ void setup() {
   WiFi.begin(ssid, password);                                     // AUTENTIFICACION RED WIFI
  
   while (WiFi.status() != WL_CONNECTED) {                         // VERIFICACION DE ESTADO CONECTADO
-    delay(100);
+    vTaskDelay(pdMS_TO_TICKS(1000)); 
     #ifdef DEBUG
     Serial.println("Setting as a Wi-Fi Station..");
     #endif
