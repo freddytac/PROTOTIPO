@@ -21,21 +21,21 @@
 
 /////////////////////////////////////////////////////////////////////////////
 // VARIABLES
+Adafruit_MPU6050 mpu;                           // DEFINICION DEL SENSOR MPU6050
+WiFiClient espClient;                           // DEFINICION DEL CLIENTE WIFI
+ThingsBoardSized<256> tb(espClient);            // DEFINICION DEL CLIENTE MQTT
 #define THINGSBOARD_SERVER "thingsboard.cloud"  // DIRECCION IP O LINK DEL SERVIDOR THINGSBOARD
 #define COUNT_OF(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
 //#define TOKEN "IM0co2XyS8k33AYgnRxT"            // TOKEN 1
 //#define TOKEN "f9a3Rmb37jSPbwFAc945"            // TOKEN 2
 #define TOKEN "s8eAQoTXImJLjkallS30"            // TOKEN 3
 //#define TOKEN "9p8WhrNL54lhJkxkqMCl"            // TOKEN 4
-Adafruit_MPU6050 mpu;                           // DEFINICION DEL SENSOR MPU6050
-WiFiClient espClient;                           // DEFINICION DEL CLIENTE WIFI
-ThingsBoardSized<256> tb(espClient);            // DEFINICION DEL CLIENTE MQT
+int ID = 3;                                     // IDENTIFICADOR DEL NODO
 int status = WL_IDLE_STATUS;                    // ESTADO DEL RADIO WIFI
 bool subscribed = false;                        // ESTADO DE LA SUSCRIPCION RPC
 uint8_t broadcastAddress[] = {0x78, 0xE3, 0x6D, 0x10, 0x30, 0xB8}; // MAC NODO PRINCIPAL
 bool skate = false;                             // BANDERA: true=patinando, false=inactivo
 int Time = 0;                                   // TIMESTAMP
-int ID = 3;                                     // IDENTIFICADOR DEL NODO
 int t0 = 0;                                     // TIEMPO DE INICIO DE CADA BUCLE
 int valorx = 0;                                 // CONDICION PARA EL REINICIO DEL NODO
 bool bandera = false;                           // INDICADOR DEL PRIMER BUCLE REALIZADO
