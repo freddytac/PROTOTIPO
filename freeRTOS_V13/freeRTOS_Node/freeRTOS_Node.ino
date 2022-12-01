@@ -19,26 +19,30 @@
 #include "SPI.h"                                // LIBRERIA SPI
 #include "base64.hpp"                           // LIBRERIA BASE 64
 
+File file;                                      // CREACION DEL ARCHIVO
+unsigned char buf[124];                         // BUFFER DE LECTURA DESDE LA MICROSD
+unsigned char base64[168];                      // BUFFER DE LOS CARRACTERES EN BASE 64
+
 /////////////////////////////////////////////////////////////////////////////
 // VARIABLES
 #define THINGSBOARD_SERVER "thingsboard.cloud"  // DIRECCION IP O LINK DEL SERVIDOR THINGSBOARD
 #define COUNT_OF(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
-//#define TOKEN "IM0co2XyS8k33AYgnRxT"            // TOKEN 1
+#define TOKEN "IM0co2XyS8k33AYgnRxT"            // TOKEN 1
 //#define TOKEN "f9a3Rmb37jSPbwFAc945"            // TOKEN 2
-#define TOKEN "s8eAQoTXImJLjkallS30"            // TOKEN 3
+//#define TOKEN "s8eAQoTXImJLjkallS30"            // TOKEN 3
 //#define TOKEN "9p8WhrNL54lhJkxkqMCl"            // TOKEN 4
-Adafruit_MPU6050 mpu;                           // DEFINICION DEL SENSOR MPU6050
 WiFiClient espClient;                           // DEFINICION DEL CLIENTE WIFI
 ThingsBoardSized<256> tb(espClient);            // DEFINICION DEL CLIENTE MQT
 int status = WL_IDLE_STATUS;                    // ESTADO DEL RADIO WIFI
-bool subscribed = false;                        // ESTADO DE LA SUSCRIPCION RPC
+Adafruit_MPU6050 mpu;                           // DEFINICION DEL SENSOR MPU6050
+bool subscribed = false;
 uint8_t broadcastAddress[] = {0x78, 0xE3, 0x6D, 0x10, 0x30, 0xB8}; // MAC NODO PRINCIPAL
 bool skate = false;                             // BANDERA: true=patinando, false=inactivo
-int Time = 0;                                   // TIMESTAMP
-int ID = 3;                                     // IDENTIFICADOR DEL NODO
+int Time = 0;                                   // MARCA DE TIEMPO
+int ID = 1;                                     // IDENTIFICADOR DEL NODO
 int t0 = 0;                                     // TIEMPO DE INICIO DE CADA BUCLE
-int valorx = 0;                                 // CONDICION PARA EL REINICIO DEL NODO
-bool bandera = false;                           // INDICADOR DEL PRIMER BUCLE REALIZADO
+int valorx = 0;
+bool bandera = false;
 const char *ssid = "Mabs";                      // SSID
 const char *password = "123probando";           // CONTRASEÑA SSID
 unsigned char data1[124];                       // BUFFER DE ALMACENAMIENTO TEMPORAL DATA1
@@ -46,10 +50,8 @@ int cont = 0;                                   // CONTADOR (PUNTERO DE ALMACENA
 char *datan;                                    // BUFFER DE ALMACENAMIENTO MICROSD DATAN
 const char *ntpServer = "pool.ntp.org";         // SERVIDOR NTP
 unsigned long Epoch_Time;                       // VARIABLE EPOCH_TIME
-File file;                                      // CREACION DEL ARCHIVO MICROSD
-unsigned char buf[124];                         // BUFFER DE LECTURA DESDE LA MICROSD
-unsigned char base64[168];                      // BUFFER DE LOS CARRACTERES EN BASE 64
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ESTRUCTURA DEL MENSAJE ESPNOW
 typedef struct struct_message
 {
@@ -59,11 +61,9 @@ typedef struct struct_message
 
 struct_message espnowMessage;                   // CREACION DEL MENSAJE ESPNOW PARA EL ENVIO DE MENSAJES AL NODO PRINCIPAL
 struct_message espnowMessage0;                  // CREACION DEL MENSAJE ESPNOW PARA RECIBIR LOS MENSAJES DEL NODO PRINCIPAL
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FUNCIONES
-
-// OBTENER EL TIEMPO ACTUAL
+// FUNCION PARA OBTENER EL TIEMPO ACTUAL
 unsigned long Get_Epoch_Time()
 {
   time_t now;
@@ -76,13 +76,13 @@ unsigned long Get_Epoch_Time()
   return now;
 }
 
-// RECEPCION ESPNOW
+//  FUNCION DE RECEPCION ESPNOW
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
 {
   memcpy(&espnowMessage0, incomingData, sizeof(espnowMessage0));
 }
 
-// ENVIO ESPNOW
+// FUNCION DE ENVIO ESPNOW
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
 {
 #ifdef DEBUG
@@ -91,7 +91,8 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
 #endif
 }
 
-// INICIO DE LA MICROSD
+///--------------------------------------------------------------------------------///
+// FUNCION DE INICIO DE LA MICROSD
 void initSDCard()
 {
   if (!SD.begin())
@@ -132,7 +133,7 @@ void initSDCard()
 #endif
 }
 
-// LECTURA DE ARCHIVO Y ENVIO DE DATOS
+// FUNCION DE LECTRURA DE ARCHIVO Y ENVIO DE DATOS
 void readFile(fs::FS &fs, const char *path)
 {
 #ifdef DEBUG
@@ -152,6 +153,7 @@ void readFile(fs::FS &fs, const char *path)
     {
       file.read(buf, 124);
       unsigned int base64_length = encode_base64(buf, 124, base64);
+      printf("%d\n", base64_length);
       datan = (char *)base64;
       tb.sendTelemetryString("array", datan);
       vTaskDelay(pdMS_TO_TICKS(600));
@@ -160,7 +162,7 @@ void readFile(fs::FS &fs, const char *path)
   file.close();
 }
 
-// ELIMINACION DE ARCHIVO
+// FUNCION DE ELIMINACION DE ARCHIVO
 void deleteFile(fs::FS &fs, const char *path)
 {
 #ifdef DEBUG
@@ -180,7 +182,7 @@ void deleteFile(fs::FS &fs, const char *path)
 #endif
 }
 
-// INICIALIZACION Y CONFIGURACION DEL SENSOR MPU6050
+// FUNCION DE INICIALIZACION Y CONFIGURACION DEL SENSOR MPU6050
 void accelerometer()
 {
 // INICIALIZACION MPU6050
@@ -268,7 +270,6 @@ void accelerometer()
 #endif
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TAREAS
 esp_err_t create_tasksN(void)
 {
@@ -292,11 +293,12 @@ esp_err_t create_tasksN(void)
                           1);
 }
 
-// TAREA NUCLEO 0
+// TAREA1
 void vTaskTbN(void *pvParameters)
 {
   while (1)
   {
+
     if (!tb.connected())
     { // VERIFICA CONEXION THINGBOARD
       subscribed = false;
@@ -328,7 +330,7 @@ void vTaskTbN(void *pvParameters)
   }
 }
 
-// TAREA NUCLEO 1
+// TAREA2
 void vTaskESP_N(void *pvParameters)
 {
   while (1)
@@ -357,28 +359,29 @@ void vTaskESP_N(void *pvParameters)
         };
         unsigned char all[12];
       } u;
-      u.ax = int16_t((a.acceleration.x) * 1000);
+
+      u.ax = int16_t((a.acceleration.x) * 10000);
 #ifdef DEBUG
       Serial.print(a.acceleration.x, 2);
       Serial.print(" ");
 #endif
-      u.ay = int16_t((a.acceleration.y) * 1000);
+      u.ay = int16_t((a.acceleration.y) * 10000);
 #ifdef DEBUG
       Serial.print(a.acceleration.y, 2);
       Serial.print(" ");
 #endif
-      u.az = int16_t((a.acceleration.z) * 1000);
-      u.gx = int16_t((g.gyro.x) * 1000);
+      u.az = int16_t((a.acceleration.z) * 10000);
+      u.gx = int16_t((g.gyro.x) * 10000);
 #ifdef DEBUG
       Serial.print(g.gyro.x, 2);
       Serial.print(" ");
 #endif
-      u.gy = int16_t((g.gyro.y) * 1000);
+      u.gy = int16_t((g.gyro.y) * 10000);
 #ifdef DEBUG
       Serial.print(g.gyro.y, 2);
       Serial.println(" ");
 #endif
-      u.gz = int16_t((g.gyro.z) * 1000);
+      u.gz = int16_t((g.gyro.z) * 10000);
       memcpy(&data1[(cont * 12) + 4], u.all, sizeof(u.all));
       cont = cont + 1;
     }
@@ -443,7 +446,7 @@ void vTaskESP_N(void *pvParameters)
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
 void setup()
 {
 #ifdef DEBUG

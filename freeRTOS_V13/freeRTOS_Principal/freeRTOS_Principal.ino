@@ -2,7 +2,7 @@
                                 UNIVERSIDAD DE CUENCA
               DESARROLLO DE UN SISTEMA IoT PARA LA ADQUISICION DE DATOS BIOMECANICOS
                     DE UN PATINADOR DE VELOCIDAD, UTILIZANDO DISPOSITIVOS ESP32
-                          INTEGRANTES: MIGUEL BELTRAN Y FREDDY TACURI
+                          NOMBRES: MIGUEL BELTRAN Y FREDDY TACURI
  */
 #include "ThingsBoard.h"
 #include <esp_now.h>
@@ -28,8 +28,8 @@ const char *password = "123probando";
 
 // REPLACE WITH YOUR ESP RECEIVER'S MAC ADDRESS
 
-uint8_t broadcastAddress1[] = {0x78, 0xE3, 0x6D, 0x19, 0xE5, 0x28};
-uint8_t broadcastAddress2[] = {0x94, 0xB5, 0x55, 0x25, 0x7C, 0x24};
+uint8_t broadcastAddress1[] = {0x30, 0xC6, 0xF7, 0x2F, 0x17, 0x40};
+uint8_t broadcastAddress2[] = {0x78, 0xE3, 0x6D, 0x11, 0x17, 0x64};
 uint8_t broadcastAddress3[] = {0x34, 0x86, 0x5D, 0x3A, 0xF4, 0xE4};
 // uint8_t broadcastAddress3[] = {0x34, 0x86, 0x5D, 0x3B, 0x45, 0xD8};
 uint8_t broadcastAddress4[] = {0x94, 0xB5, 0x55, 0x25, 0x7C, 0x24};
