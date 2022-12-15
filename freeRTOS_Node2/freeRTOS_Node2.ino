@@ -26,28 +26,26 @@ WiFiClient espClient;                           // DEFINICION DEL CLIENTE WIFI
 ThingsBoardSized<256> tb(espClient);            // DEFINICION DEL CLIENTE MQTT
 #define THINGSBOARD_SERVER "thingsboard.cloud"  // DIRECCION IP O LINK DEL SERVIDOR THINGSBOARD
 #define COUNT_OF(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
-#define TOKEN "IM0co2XyS8k33AYgnRxT"            // TOKEN 1
-//#define TOKEN "f9a3Rmb37jSPbwFAc945"            // TOKEN 2
-//#define TOKEN "s8eAQoTXImJLjkallS30"            // TOKEN 3
-//#define TOKEN "9p8WhrNL54lhJkxkqMCl"            // TOKEN 4
-int ID = 1;                                     // IDENTIFICADOR DEL NODO
+#define TOKEN "f9a3Rmb37jSPbwFAc945"            // TOKEN 2
+int ID = 2;                                     // IDENTIFICADOR DEL NODO
 int status = WL_IDLE_STATUS;                    // ESTADO DEL RADIO WIFI
 bool subscribed = false;                        // ESTADO DE LA SUSCRIPCION RPC
-uint8_t broadcastAddress[] = {0x78, 0xE3, 0x6D, 0x10, 0x30, 0xB8}; // MAC NODO PRINCIPAL
+uint8_t broadcastAddress[] = {0x94, 0xB5, 0x55, 0x2C, 0x81, 0x48}; // MAC NODO PRINCIPAL
 bool skate = false;                             // BANDERA: true=patinando, false=inactivo
 int Time = 0;                                   // TIMESTAMP
 int t0 = 0;                                     // TIEMPO DE INICIO DE CADA BUCLE
+int arreglo=0;
 int valorx = 0;                                 // CONDICION PARA EL REINICIO DEL NODO
 bool bandera = false;                           // INDICADOR DEL PRIMER BUCLE REALIZADO
 const char *ssid = "Mabs";                      // SSID
 const char *password = "123probando";           // CONTRASEÑA SSID
-unsigned char data1[124];                       // BUFFER DE ALMACENAMIENTO TEMPORAL DATA1
+unsigned char data1[126];                       // BUFFER DE ALMACENAMIENTO TEMPORAL DATA1
 int cont = 0;                                   // CONTADOR (PUNTERO DE ALMACENAMIENTO DE DATA1 EN DATAN)
 char *datan;                                    // BUFFER DE ALMACENAMIENTO MICROSD DATAN
 const char *ntpServer = "pool.ntp.org";         // SERVIDOR NTP
 unsigned long Epoch_Time;                       // VARIABLE EPOCH_TIME
 File file;                                      // CREACION DEL ARCHIVO MICROSD
-unsigned char buf[124];                         // BUFFER DE LECTURA DESDE LA MICROSD
+unsigned char buf[126];                         // BUFFER DE LECTURA DESDE LA MICROSD
 unsigned char base64[168];                      // BUFFER DE LOS CARRACTERES EN BASE 64
 
 // ESTRUCTURA DEL MENSAJE ESPNOW
@@ -150,8 +148,9 @@ void readFile(fs::FS &fs, const char *path)
   {
     while (file.available())
     {
-      file.read(buf, 124);
-      unsigned int base64_length = encode_base64(buf, 124, base64);
+      file.read(buf, 126);
+      unsigned int base64_length = encode_base64(buf, 126, base64);
+      Serial.println(base64_length);
       datan = (char *)base64;
       tb.sendTelemetryString("array", datan);
       vTaskDelay(pdMS_TO_TICKS(600));
@@ -238,7 +237,7 @@ void accelerometer()
   }
 #endif
 
-  mpu.setFilterBandwidth(MPU6050_BAND_44_HZ);   // CONFIGURACION DE LA ACELERACION MAXIMA EN Hz
+  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);   // CONFIGURACION DE LA ACELERACION MAXIMA EN Hz
 #ifdef DEBUG
   Serial.print("Filter bandwidth set to: ");
   switch (mpu.getFilterBandwidth())
@@ -338,9 +337,10 @@ void vTaskESP_N(void *pvParameters)
     {
       if (bandera == false)
       {
+        tb.sendTelemetryBool("t_start", true);
         bandera = true;
         skate = true;
-        tb.sendTelemetryBool("t_start", true);
+        Epoch_Time = Get_Epoch_Time();
       }
       sensors_event_t a, g, t;
       mpu.getEvent(&a, &g, &t);
@@ -351,24 +351,24 @@ void vTaskESP_N(void *pvParameters)
           int16_t ax;
           int16_t ay;
           int16_t az;
-          int16_t gx;
+          /*int16_t gx;
           int16_t gy;
-          int16_t gz;
+          int16_t gz;*/
         };
-        unsigned char all[12];
+        unsigned char all[6];
       } u;
-      u.ax = int16_t((a.acceleration.x) * 1000);
+      u.ax = int16_t((a.acceleration.x)*-1000);
 #ifdef DEBUG
       Serial.print(a.acceleration.x, 2);
       Serial.print(" ");
 #endif
-      u.ay = int16_t((a.acceleration.y) * 1000);
+      u.ay = int16_t((a.acceleration.z)*1000);
 #ifdef DEBUG
       Serial.print(a.acceleration.y, 2);
-      Serial.print(" ");
+      Serial.println(" ");
 #endif
-      u.az = int16_t((a.acceleration.z) * 1000);
-      u.gx = int16_t((g.gyro.x) * 1000);
+      u.az = int16_t((a.acceleration.y)*-1000);
+/*      u.gx = int16_t((g.gyro.x) * 1000);
 #ifdef DEBUG
       Serial.print(g.gyro.x, 2);
       Serial.print(" ");
@@ -379,21 +379,23 @@ void vTaskESP_N(void *pvParameters)
       Serial.println(" ");
 #endif
       u.gz = int16_t((g.gyro.z) * 1000);
-      memcpy(&data1[(cont * 12) + 4], u.all, sizeof(u.all));
+*/
+      memcpy(&data1[(cont * 6) + 6], u.all, sizeof(u.all));
       cont = cont + 1;
     }
-    if (cont == 10 && espnowMessage0.nstate == true && espnowMessage0.id == 1)
+    if (cont == 20 && espnowMessage0.nstate == true && espnowMessage0.id == 1)
     {
-      Epoch_Time = Get_Epoch_Time();
       union t_tag
       {
         struct
         {
           long time1;
+          int time2;
         };
-        unsigned char allt[4];
+        unsigned char allt[6];
       } t;
       t.time1 = Epoch_Time;
+      t.time2 = arreglo;
       memcpy(&data1[0], t.allt, sizeof(t.allt));
       file = SD.open("/data.txt", FILE_APPEND);
       if (file)
@@ -409,19 +411,21 @@ void vTaskESP_N(void *pvParameters)
       }
 #endif
       memset(data1, 0, sizeof(data1));
+      arreglo=arreglo+1;
     }
     else if (bandera == true && espnowMessage0.id == 0)
     {
-      Epoch_Time = Get_Epoch_Time();
       union t_tag
       {
         struct
         {
           long time1;
+          int time2;
         };
-        unsigned char allt[4];
+        unsigned char allt[6];
       } t;
       t.time1 = Epoch_Time;
+      t.time2 = arreglo;
       memcpy(&data1[0], t.allt, sizeof(t.allt));
       file = SD.open("/data.txt", FILE_APPEND);
       if (file)
@@ -439,7 +443,12 @@ void vTaskESP_N(void *pvParameters)
       }
 #endif
     }
-    vTaskDelay(pdMS_TO_TICKS(100 + t0 - millis()));
+    if (espnowMessage0.id == 0)
+    {
+      goto a;
+    }
+    vTaskDelay(pdMS_TO_TICKS(50 + t0 - millis()));
+    a:;
   }
 }
 
