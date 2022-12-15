@@ -27,26 +27,29 @@ ThingsBoardSized<256> tb(espClient);            // DEFINICION DEL CLIENTE MQTT
 #define THINGSBOARD_SERVER "thingsboard.cloud"  // DIRECCION IP O LINK DEL SERVIDOR THINGSBOARD
 #define COUNT_OF(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
 #define TOKEN "IM0co2XyS8k33AYgnRxT"            // TOKEN 1
-int ID = 1;                                     // IDENTIFICADOR DEL NODO
+const int ID = 1;                                     // IDENTIFICADOR DEL NODO
 int status = WL_IDLE_STATUS;                    // ESTADO DEL RADIO WIFI
 bool subscribed = false;                        // ESTADO DE LA SUSCRIPCION RPC
 uint8_t broadcastAddress[] = {0x94, 0xB5, 0x55, 0x2C, 0x81, 0x48}; // MAC NODO PRINCIPAL
 bool skate = false;                             // BANDERA: true=patinando, false=inactivo
-int Time = 0;                                   // TIMESTAMP
 int t0 = 0;                                     // TIEMPO DE INICIO DE CADA BUCLE
-int arreglo=0;
+int arr=0;
 int valorx = 0;                                 // CONDICION PARA EL REINICIO DEL NODO
 bool bandera = false;                           // INDICADOR DEL PRIMER BUCLE REALIZADO
+bool flag=false;
+bool band=false;
 const char *ssid = "Mabs";                      // SSID
 const char *password = "123probando";           // CONTRASEÑA SSID
-unsigned char data1[126];                       // BUFFER DE ALMACENAMIENTO TEMPORAL DATA1
+unsigned char data1[156];                       // BUFFER DE ALMACENAMIENTO TEMPORAL DATA1
 int cont = 0;                                   // CONTADOR (PUNTERO DE ALMACENAMIENTO DE DATA1 EN DATAN)
 char *datan;                                    // BUFFER DE ALMACENAMIENTO MICROSD DATAN
 const char *ntpServer = "pool.ntp.org";         // SERVIDOR NTP
 unsigned long Epoch_Time;                       // VARIABLE EPOCH_TIME
 File file;                                      // CREACION DEL ARCHIVO MICROSD
-unsigned char buf[126];                         // BUFFER DE LECTURA DESDE LA MICROSD
-unsigned char base64[168];                      // BUFFER DE LOS CARRACTERES EN BASE 64
+unsigned char buf[150];                         // BUFFER DE LECTURA DESDE LA MICROSD
+unsigned char base64[208];                      // BUFFER DE LOS CARRACTERES EN BASE 64
+unsigned char *ptrbuff;
+unsigned char *ptr;
 
 // ESTRUCTURA DEL MENSAJE ESPNOW
 typedef struct struct_message
@@ -148,15 +151,32 @@ void readFile(fs::FS &fs, const char *path)
   {
     while (file.available())
     {
-      file.read(buf, 126);
-      unsigned int base64_length = encode_base64(buf, 126, base64);
+      memset(data1, 0, sizeof(data1));
+      memset(buf, 0, sizeof(buf));
+      file.read(buf, 150);
+      memcpy(&data1[6], buf, sizeof(buf));
+      union t_tag
+      {
+        struct
+        {
+          long time1;
+          int time2;
+        };
+        unsigned char allt[6];
+      } t;
+      t.time1 = Epoch_Time;
+      t.time2 = arr;
+      memcpy(&data1[0], t.allt, sizeof(t.allt));
+      unsigned int base64_length = encode_base64(data1, 156, base64);
       Serial.println(base64_length);
       datan = (char *)base64;
       tb.sendTelemetryString("array", datan);
-      vTaskDelay(pdMS_TO_TICKS(600));
+      vTaskDelay(pdMS_TO_TICKS(500));
+      arr=arr+1;
     }
-  }
   file.close();
+  }
+  
 }
 
 // ELIMINACION DE ARCHIVO
@@ -237,7 +257,7 @@ void accelerometer()
   }
 #endif
 
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);   // CONFIGURACION DE LA ACELERACION MAXIMA EN Hz
+  mpu.setFilterBandwidth(MPU6050_BAND_94_HZ);   // CONFIGURACION DE LA ACELERACION MAXIMA EN Hz
 #ifdef DEBUG
   Serial.print("Filter bandwidth set to: ");
   switch (mpu.getFilterBandwidth())
@@ -276,18 +296,18 @@ esp_err_t create_tasksN(void)
   // TAREA1: THINGSBOARD, LECTURA Y ENVIO DE DATOS.
   xTaskCreatePinnedToCore(vTaskTbN,
                           "vTaskTbN",
-                          1024 * 10,
-                          &ucParameterToPass,
+                          1024 * 15,
+                          NULL,
                           1,
-                          &xHandle,
+                          NULL,
                           0);
-  // TAREA: ESPNOW, LECTURA DEL SENSOR MPU6050, ALMACENAMIENTO EN LA MICROSD.
+  // TAREA: ESPNOW, LECTURA DEL SENSOR MPU6050.
   xTaskCreatePinnedToCore(vTaskESP_N,
                           "vTaskESP_N",
-                          1024 * 10,
-                          &ucParameterToPass,
-                          1,
-                          &xHandle,
+                          1024 * 40,
+                          NULL,
+                          2,
+                          NULL,
                           1);
 }
 
@@ -314,13 +334,18 @@ void vTaskTbN(void *pvParameters)
         return;
       }
     }
-    if (skate == true && espnowMessage0.id == 0 && bandera == false)
+    if (skate == true && espnowMessage0.id == 0)
     {
+      file.close();
+      vTaskDelay(pdMS_TO_TICKS(5));
       readFile(SD, "/data.txt");
       valorx = 1;
     }
     if (valorx == 1)
     {
+      vTaskDelay(pdMS_TO_TICKS(10));
+      deleteFile(SD, "/data.txt");
+      vTaskDelay(pdMS_TO_TICKS(10));
       ESP.restart();
     }
     vTaskDelay(pdMS_TO_TICKS(5));
@@ -338,6 +363,7 @@ void vTaskESP_N(void *pvParameters)
       if (bandera == false)
       {
         tb.sendTelemetryBool("t_start", true);
+        file = SD.open("/data.txt", FILE_APPEND);
         bandera = true;
         skate = true;
         Epoch_Time = Get_Epoch_Time();
@@ -364,7 +390,7 @@ void vTaskESP_N(void *pvParameters)
 #endif
       u.ay = int16_t((a.acceleration.z)*-1000);
 #ifdef DEBUG
-      Serial.print(a.acceleration.y, 2);
+      Serial.print(a.acceleration.z*-1, 2);
       Serial.println(" ");
 #endif
       u.az = int16_t((a.acceleration.y)*-1000);
@@ -379,78 +405,30 @@ void vTaskESP_N(void *pvParameters)
       Serial.println(" ");
 #endif
       u.gz = int16_t((g.gyro.z) * 1000);
-*/
-      memcpy(&data1[(cont * 6) + 6], u.all, sizeof(u.all));
-      cont = cont + 1;
-    }
-    if (cont == 20 && espnowMessage0.nstate == true && espnowMessage0.id == 1)
-    {
-      union t_tag
-      {
-        struct
-        {
-          long time1;
-          int time2;
-        };
-        unsigned char allt[6];
-      } t;
-      t.time1 = Epoch_Time;
-      t.time2 = arreglo;
-      memcpy(&data1[0], t.allt, sizeof(t.allt));
-      file = SD.open("/data.txt", FILE_APPEND);
+      
+*/ 
+      
       if (file)
-      {
-        file.write(data1, sizeof(data1));
-        file.close();
-        cont = 0;
+      { 
+        file.write(u.all, sizeof(u.all));
       }
-#ifdef DEBUG
-      else
-      {
+      #ifdef DEBUG
+      else {
         Serial.print(F("SD Card: error on opening file"));
       }
-#endif
-      memset(data1, 0, sizeof(data1));
-      arreglo=arreglo+1;
+      #endif
+     
     }
-    else if (bandera == true && espnowMessage0.id == 0)
-    {
-      union t_tag
-      {
-        struct
-        {
-          long time1;
-          int time2;
-        };
-        unsigned char allt[6];
-      } t;
-      t.time1 = Epoch_Time;
-      t.time2 = arreglo;
-      memcpy(&data1[0], t.allt, sizeof(t.allt));
-      file = SD.open("/data.txt", FILE_APPEND);
-      if (file)
-      {
-        Serial.println("ingresa");
-        file.write(data1, sizeof(data1));
-        file.close();
-        cont = 0;
-        bandera = false;
-      }
-#ifdef DEBUG
-      else
-      {
-        Serial.print(F("SD Card: error on opening file"));
-      }
-#endif
-    }
+    //vTaskDelay(pdMS_TO_TICKS(5));
     if (espnowMessage0.id == 0)
     {
       goto a;
     }
-    vTaskDelay(pdMS_TO_TICKS(50 + t0 - millis()));
+    vTaskDelay(pdMS_TO_TICKS(10 + t0 - millis()));
     a:;
   }
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void setup()
