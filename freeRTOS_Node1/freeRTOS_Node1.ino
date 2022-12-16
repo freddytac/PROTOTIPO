@@ -171,10 +171,10 @@ void readFile(fs::FS &fs, const char *path)
       Serial.println(base64_length);
       datan = (char *)base64;
       tb.sendTelemetryString("array", datan);
-      vTaskDelay(pdMS_TO_TICKS(500));
+      vTaskDelay(pdMS_TO_TICKS(125));
       arr=arr+1;
     }
-  file.close();
+    file.close();
   }
   
 }
@@ -296,7 +296,7 @@ esp_err_t create_tasksN(void)
   // TAREA1: THINGSBOARD, LECTURA Y ENVIO DE DATOS.
   xTaskCreatePinnedToCore(vTaskTbN,
                           "vTaskTbN",
-                          1024 * 15,
+                          1024 * 20,
                           NULL,
                           1,
                           NULL,
@@ -344,6 +344,7 @@ void vTaskTbN(void *pvParameters)
     if (valorx == 1)
     {
       vTaskDelay(pdMS_TO_TICKS(10));
+      file.close();
       deleteFile(SD, "/data.txt");
       vTaskDelay(pdMS_TO_TICKS(10));
       ESP.restart();
