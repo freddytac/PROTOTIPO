@@ -7,59 +7,59 @@
 ////////////////////////////////////////////////////////////////////////////
 #define DEBUG 1
 // LIBRERIAS
-#include "ThingsBoard.h"                                                 // LIBRERIA THINGSBOARD
-#include <esp_now.h>                                                     // LIBRERIA ESPNOW
-#include <WiFi.h>                                                        // LIBRERIA WIFI
-#include "time.h"                                                        // LIBRERIA TIME
-#include <Adafruit_MPU6050.h>                                            // LIBRERIA SENSOR MPU6050
-#include <Adafruit_Sensor.h>                                             // LIBRERIA SENSOR
-#include <Wire.h>                                                        // LIBRERIA I2C, SDA Y SDL
-#include "FS.h"                                                          // LIBRERIA FS
-#include "SD.h"                                                          // LIBRERIA SD
-#include "SPI.h"                                                         // LIBRERIA SPI
-#include "freertos/FreeRTOS.h"                                           // LIBRERIAS FreeRTOS
-#include "freertos/task.h"     
-#include <stdio.h>
-#include "esp_system.h"
-#include "driver/gpio.h"
-#include "base64.hpp"                                                    // LIBRERIA BASE 64
+#include "ThingsBoard.h"                        // LIBRERIA THINGSBOARD
+#include <esp_now.h>                            // LIBRERIA ESPNOW
+#include <WiFi.h>                               // LIBRERIA WIFI
+#include "time.h"                               // LIBRERIA TIME
+#include <Adafruit_MPU6050.h>                   // LIBRERIA SENSOR MPU6050
+#include <Adafruit_Sensor.h>                    // LIBRERIA SENSOR
+#include <Wire.h>                               // LIBRERIA I2C, SDA Y SDL
+#include "FS.h"                                 // LIBRERIA FS
+#include "SD.h"                                 // LIBRERIA SD
+#include "SPI.h"                                // LIBRERIA SPI
+#include "base64.hpp"                           // LIBRERIA BASE 64
 
 /////////////////////////////////////////////////////////////////////////////
 // VARIABLES
-Adafruit_MPU6050 mpu;                                                    // DEFINICION DEL SENSOR MPU6050
-WiFiClient espClient;                                                    // DEFINICION DEL CLIENTE WIFI
-ThingsBoardSized<256> tb(espClient);                                     // DEFINICION DEL CLIENTE MQTT
-#define THINGSBOARD_SERVER "thingsboard.cloud"                           // DIRECCION IP O LINK DEL SERVIDOR THINGSBOARD
+Adafruit_MPU6050 mpu;                           // DEFINICION DEL SENSOR MPU6050
+WiFiClient espClient;                           // DEFINICION DEL CLIENTE WIFI
+ThingsBoardSized<256> tb(espClient);            // DEFINICION DEL CLIENTE MQTT
+#define THINGSBOARD_SERVER "thingsboard.cloud"  // DIRECCION IP O LINK DEL SERVIDOR THINGSBOARD
 #define COUNT_OF(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
-#define TOKEN "9p8WhrNL54lhJkxkqMCl"                                     // TOKEN 1
-const uint8_t ID = 4;                                                    // IDENTIFICADOR DEL NODO
-int status = WL_IDLE_STATUS;                                             // ESTADO DEL RADIO WIFI
-bool subscribed = false;                                                 // ESTADO DE LA SUSCRIPCION RPC
-const uint8_t broadcastAddress[] = {0x94, 0xB5, 0x55, 0x2C, 0x81, 0x48}; // MAC NODO PRINCIPAL
-bool skate = false;                                                      // BANDERA: true=patinando, false=inactivo
-int t0 = 0;                                                              // TIEMPO DE INICIO DE CADA BUCLE
-int arr = 0;                                                             // CONTADOR DE MENSAJES ENVIADOS
-uint8_t valorx = 0;                                                      // CONDICION PARA EL REINICIO DEL NODO
-bool bandera = false;                                                    // INDICADOR DEL PRIMER BUCLE REALIZADO
-const char *ssid = "Mabs";                                               // SSID
-const char *password = "123probando";                                    // CONTRASEÑA SSID
-unsigned char data1[156];                                                // BUFFER DE ALMACENAMIENTO TEMPORAL DATA1
-char *datan;                                                             // BUFFER DE ALMACENAMIENTO MICROSD DATAN
-const char *ntpServer = "pool.ntp.org";                                  // SERVIDOR NTP
-unsigned long Epoch_Time;                                                // VARIABLE EPOCH_TIME
-File file;                                                               // CREACION DEL ARCHIVO MICROSD
-unsigned char buf[150];                                                  // BUFFER DE LECTURA DESDE LA MICROSD
-unsigned char base64[208];                                               // BUFFER DE LOS CARRACTERES EN BASE 64
+#define TOKEN "f9a3Rmb37jSPbwFAc945"            // TOKEN 2
+int ID = 2;                                     // IDENTIFICADOR DEL NODO
+int status = WL_IDLE_STATUS;                    // ESTADO DEL RADIO WIFI
+bool subscribed = false;                        // ESTADO DE LA SUSCRIPCION RPC
+uint8_t broadcastAddress[] = {0x94, 0xB5, 0x55, 0x2C, 0x81, 0x48}; // MAC NODO PRINCIPAL
+bool skate = false;                             // BANDERA: true=patinando, false=inactivo
+int t0 = 0;                                     // TIEMPO DE INICIO DE CADA BUCLE
+int arr=0;
+int valorx = 0;                                 // CONDICION PARA EL REINICIO DEL NODO
+bool bandera = false;                           // INDICADOR DEL PRIMER BUCLE REALIZADO
+bool flag=false;
+bool band=false;
+const char *ssid = "Mabs";                      // SSID
+const char *password = "123probando";           // CONTRASEÑA SSID
+unsigned char data1[156];                       // BUFFER DE ALMACENAMIENTO TEMPORAL DATA1
+int cont = 0;                                   // CONTADOR (PUNTERO DE ALMACENAMIENTO DE DATA1 EN DATAN)
+char *datan;                                    // BUFFER DE ALMACENAMIENTO MICROSD DATAN
+const char *ntpServer = "pool.ntp.org";         // SERVIDOR NTP
+unsigned long Epoch_Time;                       // VARIABLE EPOCH_TIME
+File file;                                      // CREACION DEL ARCHIVO MICROSD
+unsigned char buf[150];                         // BUFFER DE LECTURA DESDE LA MICROSD
+unsigned char base64[208];                      // BUFFER DE LOS CARRACTERES EN BASE 64
+unsigned char *ptrbuff;
+unsigned char *ptr;
 
 // ESTRUCTURA DEL MENSAJE ESPNOW
 typedef struct struct_message
 {
-  int id;      // Identificador de la tarjeta
-  bool nstate; // Estado del nodo
+  int id;                                       // Identificador de la tarjeta
+  bool nstate;                                  // Estado del nodo
 } struct_message;
 
-struct_message espnowMessage;                                            // CREACION DEL MENSAJE ESPNOW PARA EL ENVIO DE MENSAJES AL NODO PRINCIPAL
-struct_message espnowMessage0;                                           // CREACION DEL MENSAJE ESPNOW PARA RECIBIR LOS MENSAJES DEL NODO PRINCIPAL
+struct_message espnowMessage;                   // CREACION DEL MENSAJE ESPNOW PARA EL ENVIO DE MENSAJES AL NODO PRINCIPAL
+struct_message espnowMessage0;                  // CREACION DEL MENSAJE ESPNOW PARA RECIBIR LOS MENSAJES DEL NODO PRINCIPAL
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FUNCIONES
@@ -151,7 +151,7 @@ void readFile(fs::FS &fs, const char *path)
   {
     while (file.available())
     {
-      // memset(data1, 0, sizeof(data1));
+      memset(data1, 0, sizeof(data1));
       memset(buf, 0, sizeof(buf));
       file.read(buf, 150);
       memcpy(&data1[6], buf, sizeof(buf));
@@ -171,11 +171,12 @@ void readFile(fs::FS &fs, const char *path)
       Serial.println(base64_length);
       datan = (char *)base64;
       tb.sendTelemetryString("array", datan);
-      vTaskDelay(pdMS_TO_TICKS(250));
-      arr = arr + 1;
+      vTaskDelay(pdMS_TO_TICKS(125));
+      arr=arr+1;
     }
     file.close();
   }
+  
 }
 
 // ELIMINACION DE ARCHIVO
@@ -201,7 +202,7 @@ void deleteFile(fs::FS &fs, const char *path)
 // INICIALIZACION Y CONFIGURACION DEL SENSOR MPU6050
 void accelerometer()
 {
-  // INICIALIZACION MPU6050
+// INICIALIZACION MPU6050
   if (!mpu.begin())
   {
 #ifdef DEBUG
@@ -216,7 +217,7 @@ void accelerometer()
   Serial.println("MPU6050 Found!");
 #endif
 
-  // CONFIGURACION DEL SENSOR
+// CONFIGURACION DEL SENSOR
   mpu.setAccelerometerRange(MPU6050_RANGE_4_G); // CONFIGURACION DE LA MAXIMA ACELRACION EN G
 #ifdef DEBUG
   Serial.print("Accelerometer range set to: ");
@@ -236,7 +237,7 @@ void accelerometer()
     break;
   }
 #endif
-  mpu.setGyroRange(MPU6050_RANGE_250_DEG); // CONFIGURACION DEL MAXIMO GIRO EN GRADOS
+  mpu.setGyroRange(MPU6050_RANGE_250_DEG);      // CONFIGURACION DEL MAXIMO GIRO EN GRADOS
 #ifdef DEBUG
   Serial.print("Gyro range set to: ");
   switch (mpu.getGyroRange())
@@ -256,7 +257,7 @@ void accelerometer()
   }
 #endif
 
-  mpu.setFilterBandwidth(MPU6050_BAND_260_HZ); // CONFIGURACION DE LA ACELERACION MAXIMA EN Hz
+  mpu.setFilterBandwidth(MPU6050_BAND_94_HZ);   // CONFIGURACION DE LA ACELERACION MAXIMA EN Hz
 #ifdef DEBUG
   Serial.print("Filter bandwidth set to: ");
   switch (mpu.getFilterBandwidth())
@@ -290,19 +291,20 @@ void accelerometer()
 // TAREAS
 esp_err_t create_tasksN(void)
 {
-
+  static uint8_t ucParameterToPass;
+  TaskHandle_t xHandle = NULL;
   // TAREA1: THINGSBOARD, LECTURA Y ENVIO DE DATOS.
   xTaskCreatePinnedToCore(vTaskTbN,
                           "vTaskTbN",
-                          1024 * 15,
+                          1024 * 20,
                           NULL,
                           1,
                           NULL,
                           0);
-  // TAREA: ESPNOW, LECTURA DEL SENSOR MPU6050 Y ALMACENAMIENTO DE DATOS.
+  // TAREA: ESPNOW, LECTURA DEL SENSOR MPU6050.
   xTaskCreatePinnedToCore(vTaskESP_N,
                           "vTaskESP_N",
-                          1024 * 20,
+                          1024 * 40,
                           NULL,
                           2,
                           NULL,
@@ -335,12 +337,16 @@ void vTaskTbN(void *pvParameters)
     if (skate == true && espnowMessage0.id == 0)
     {
       file.close();
+      vTaskDelay(pdMS_TO_TICKS(5));
       readFile(SD, "/data.txt");
       valorx = 1;
     }
     if (valorx == 1)
     {
-      vTaskDelay(pdMS_TO_TICKS(5));
+      //vTaskDelay(pdMS_TO_TICKS(10));
+      //file.close();
+      //deleteFile(SD, "/data.txt");
+      vTaskDelay(pdMS_TO_TICKS(10));
       ESP.restart();
     }
     vTaskDelay(pdMS_TO_TICKS(5));
@@ -372,48 +378,66 @@ void vTaskESP_N(void *pvParameters)
           int16_t ax;
           int16_t ay;
           int16_t az;
+          /*int16_t gx;
+          int16_t gy;
+          int16_t gz;*/
         };
         unsigned char all[6];
       } u;
-      u.ax = int16_t((a.acceleration.x) * -1000);
+      u.ax = int16_t((a.acceleration.x)*-1000);
 #ifdef DEBUG
       Serial.print(a.acceleration.x, 2);
       Serial.print(" ");
 #endif
-      u.ay = int16_t((a.acceleration.z) * 1000);
+      u.ay = int16_t((a.acceleration.z)*1000);
 #ifdef DEBUG
-      Serial.print(a.acceleration.z * -1, 2);
+      Serial.print(a.acceleration.z*-1, 2);
       Serial.println(" ");
 #endif
-      u.az = int16_t((a.acceleration.y) * -1000);
-
+      u.az = int16_t((a.acceleration.y)*-1000);
+/*      u.gx = int16_t((g.gyro.x) * 1000);
+#ifdef DEBUG
+      Serial.print(g.gyro.x, 2);
+      Serial.print(" ");
+#endif
+      u.gy = int16_t((g.gyro.y) * 1000);
+#ifdef DEBUG
+      Serial.print(g.gyro.y, 2);
+      Serial.println(" ");
+#endif
+      u.gz = int16_t((g.gyro.z) * 1000);
+      
+*/ 
+      
       if (file)
-      {
+      { 
         file.write(u.all, sizeof(u.all));
       }
-#ifdef DEBUG
-      else
-      {
+      #ifdef DEBUG
+      else {
         Serial.print(F("SD Card: error on opening file"));
       }
-#endif
+      #endif
+     
     }
+    //vTaskDelay(pdMS_TO_TICKS(5));
     if (espnowMessage0.id == 0)
     {
       goto a;
     }
-    vTaskDelay(pdMS_TO_TICKS(20 + t0 - millis()));
-  a:;
+    vTaskDelay(pdMS_TO_TICKS(25 + t0 - millis()));
+    a:;
   }
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void setup()
 {
 #ifdef DEBUG
-  Serial.begin(115200); // PUERTO SERIAL
+  Serial.begin(115200);                         // PUERTO SERIAL
 #endif
-  WiFi.begin(ssid, password); // AUTENTIFICACION RED WIFI
+  WiFi.begin(ssid, password);                   // AUTENTIFICACION RED WIFI
   while (WiFi.status() != WL_CONNECTED)
   { // VERIFICACION DE ESTADO CONECTADO
     vTaskDelay(pdMS_TO_TICKS(1000));
@@ -421,7 +445,7 @@ void setup()
     Serial.println("Setting as a Wi-Fi Station..");
 #endif
   }
-  WiFi.mode(WIFI_AP_STA); // CONFIGURACION COMO AP Y ESTACION WIFI
+  WiFi.mode(WIFI_AP_STA);                       // CONFIGURACION COMO AP Y ESTACION WIFI
   configTime(0, 0, ntpServer);
   if (esp_now_init() != ESP_OK)
   { // VALIDACION DE INICIACION ESPNOW
@@ -430,9 +454,9 @@ void setup()
 #endif
     return;
   }
-  esp_now_register_send_cb(OnDataSent); // ESTADO DEL PAQUETE TRANSMITIDO
-  esp_now_register_recv_cb(OnDataRecv); // ESTADO DEL PAQUETE RECIBIDO
-  esp_now_peer_info_t peerInfo;         // EMPAREJAMIENTO ESPNOW
+  esp_now_register_send_cb(OnDataSent);         // ESTADO DEL PAQUETE TRANSMITIDO
+  esp_now_register_recv_cb(OnDataRecv);         // ESTADO DEL PAQUETE RECIBIDO
+  esp_now_peer_info_t peerInfo;                 // EMPAREJAMIENTO ESPNOW
 
   // REGISTROS DE EMPAREJAMIENTO CON EL NODO PRINCIPAL
   memcpy(peerInfo.peer_addr, broadcastAddress, 6);
@@ -446,10 +470,10 @@ void setup()
 #endif
     return;
   }
-  initSDCard();                                                                                        // INICIALIZACION MICROSD
-  deleteFile(SD, "/data.txt");                                                                         // ELIMINA ARCHIVO EN LA MICROSD
-  espnowMessage.id = ID;                                                                               // ID
-  espnowMessage.nstate = true;                                                                         // ESTADO DEL NODO
+  initSDCard();                                 // INICIALIZACION MICROSD
+  deleteFile(SD, "/data.txt");                  // ELIMINA ARCHIVO EN LA MICROSD
+  espnowMessage.id = ID;                        // ID
+  espnowMessage.nstate = true;                  // ESTADO DEL NODO
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&espnowMessage, sizeof(espnowMessage)); // RESULTADO DEL ENVIO DEL PAQUETE ESPNOW
   if (result == ESP_OK)
   {
@@ -463,8 +487,8 @@ void setup()
     Serial.println("Error sending the data");
   }
 #endif
-  accelerometer(); // INICIA EL ACELEROMETRO
-  create_tasksN(); // INICIA LAS TAREA
+  accelerometer();                              // INICIA EL ACELEROMETRO
+  create_tasksN();                              // INICIA LAS TAREAS
 }
 
 void loop() {}
